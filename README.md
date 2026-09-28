@@ -12,7 +12,10 @@ Este repositório contém o projeto completo do banco de dados relacional para u
 #### 1 - Executar o script "00_SQL_FULL.sql", o qual contem:
 
 ##### 1.1 - Criação do Banco de Dados:
+
+```bash
 psql -U postgres -c "CREATE DATABASE sistema_academico;"
+```
 
 ##### 1.2 - Executar DDL (Estrutura e Restrições)
 Seção SCRIPT 01: DDL E RESTRIÇÕES DE INTEGRIDADE
