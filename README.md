@@ -17,16 +17,16 @@ Execute os scripts na sequência numérica indicada:
 # 1.1 - Criação do Banco de Dados:
 psql -U postgres -c "CREATE DATABASE sistema_academico;"
 
-# 2.2 - Executar DDL (Estrutura e Restrições)
+# 1.2 - Executar DDL (Estrutura e Restrições)
 Seção SCRIPT 01: DDL E RESTRIÇÕES DE INTEGRIDADE
 
-# 3. Carregar Dados de Teste (generate_series)
+# 1.3 - Carregar Dados de Teste (generate_series)
 Seção SCRIPT 02: CARGA DE DADOS (150 Alunos, 12 Turmas, 450+ Matrículas)
 
-# 4. Executar Consultas Analíticas
+# 1.4 - Executar Consultas Analíticas
 Seção SCRIPT 03: CONSULTAS ANALÍTICAS (10 SELECTs)
 
-# 5. Gerar Evidências de EXPLAIN
+# 1.5 - Gerar Evidências de EXPLAIN
 Seção SCRIPT 04: EVIDÊNCIAS DE EXECUÇÃO (EXPLAIN ANALYZE)
 
 ```
