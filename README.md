@@ -50,15 +50,3 @@ docker run --name pg-academico -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sist
 - Consultas Recursivas (WITH RECURSIVE): Árvore de pré-requisitos (Q7) e Aptidão para cursar disciplinas (Q8).
 
 ---
-
-### `AUTORES.md`
-
-```markdown
-# Declaração de Autoria e Divisão de Tarefas
-
-| Integrante | Responsabilidade principal / Frentes de Trabalho |
-| :--- | :--- |
-| **[Nome do Aluno 1]** | Modelagem Lógica, DDL (`01_schema.sql`) e Restrições de Integridade |
-| **[Nome do Aluno 2]** | Script de Carga de Dados via `generate_series` (`02_seeds.sql`) |
-| **[Nome do Aluno 3]** | Desenvolvimento dos SELECTs Avançados, Window Functions e CTEs Recursivas (`03_queries.sql`) |
-| **[Nome do Aluno 4]** | Análise de Desempenho com `EXPLAIN ANALYZE` (`04_explain.sql`) e Documentação (`README.md`) |
