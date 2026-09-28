@@ -8,7 +8,7 @@
 - Implementação de duas correções distintas — uma por bloqueio explícito, outra por nível de isolamento;
 - Comparação fundamentada entre as duas abordagens (custo, contenção, necessidade de retentativa).
 
-## 3. Responsável por Administração e Operação: Bruno Washignton Gomes Belizário
+## 3. Responsável por Administração e Operação: Bruno Washington Gomes Belizário
 - Views (oferta, vagas, histórico) e uma materialized view de indicadores com política de atualização justificada;
 - Papéis de acesso (aluno, secretaria, coordenacao) com GRANT/REVOKE e row-level security;
 - Procedimento de backup e restauração, documentado e reproduzível do zero.
