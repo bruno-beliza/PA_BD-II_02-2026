@@ -10,79 +10,129 @@ psql -U postgres -c "CREATE DATABASE sistema_academico;"
 -- SCRIPT 01: DDL E RESTRIÇÕES DE INTEGRIDADE
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS campus (
+CREATE TABLE IF NOT EXISTS tb_pais (
+    id_pais SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    codigo_iso2 CHAR(2) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS tb_estado (
+    id_estado SERIAL PRIMARY KEY,
+    id_pais INT NOT NULL REFERENCES tb_pais(id_pais) ON DELETE RESTRICT,
+    nome VARCHAR(100) NOT NULL,
+    uf CHAR(2) NOT NULL,
+    CONSTRAINT uk_estado_uf UNIQUE (id_pais, uf)
+);
+
+CREATE TABLE IF NOT EXISTS tb_municipio (
+    id_municipio SERIAL PRIMARY KEY,
+    id_estado INT NOT NULL REFERENCES tb_estado(id_estado) ON DELETE RESTRICT,
+    nome VARCHAR(100) NOT NULL,
+    codigo_ibge INT UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS tb_campus (
     id_campus SERIAL PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL
+    id_municipio INT NOT NULL REFERENCES tb_municipio(id_municipio) ON DELETE RESTRICT,
+    nome VARCHAR(100) NOT NULL,
+    endereco VARCHAR(200)
 );
 
-CREATE TABLE IF NOT EXISTS curso (
+-- Tabela Geral de Cursos (Catálogo Geral)
+CREATE TABLE IF NOT EXISTS tb_curso (
     id_curso SERIAL PRIMARY KEY,
-    id_campus INT NOT NULL REFERENCES campus(id_campus) ON DELETE RESTRICT,
-    nome VARCHAR(100) NOT NULL
+    nome VARCHAR(100) NOT NULL,
+    grau VARCHAR(30) NOT NULL CHECK (grau IN ('BACHARELADO', 'LICENCIATURA', 'TECNOLOGO', 'POS_GRADUACAO'))
 );
 
-CREATE TABLE IF NOT EXISTS curriculo (
+-- Tabela Associativa (Oferta de Cursos por Campus - N:N)
+CREATE TABLE IF NOT EXISTS tb_campus_curso (
+    id_campus_curso SERIAL PRIMARY KEY,
+    id_campus INT NOT NULL REFERENCES tb_campus(id_campus) ON DELETE CASCADE,
+    id_curso INT NOT NULL REFERENCES tb_curso(id_curso) ON DELETE RESTRICT,
+    turno_predominante VARCHAR(20) CHECK (turno_predominante IN ('MATUTINO', 'VESPERTINO', 'NOTURNO', 'INTEGRAL')),
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uk_campus_curso UNIQUE (id_campus, id_curso)
+);
+
+-- Currículo vinculado à oferta específica do Campus
+CREATE TABLE IF NOT EXISTS tb_curriculo (
     id_curriculo SERIAL PRIMARY KEY,
-    id_curso INT NOT NULL REFERENCES curso(id_curso) ON DELETE CASCADE,
+    id_campus_curso INT NOT NULL REFERENCES tb_campus_curso(id_campus_curso) ON DELETE RESTRICT,
+    codigo_matriz VARCHAR(20) NOT NULL,
     ano_vigencia SMALLINT NOT NULL CHECK (ano_vigencia >= 2000),
-    ativo BOOLEAN NOT NULL DEFAULT TRUE
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT uk_curriculo_campus_codigo UNIQUE (id_campus_curso, codigo_matriz)
 );
 
-CREATE TABLE IF NOT EXISTS disciplina (
+CREATE TABLE IF NOT EXISTS tb_disciplina (
     id_disciplina SERIAL PRIMARY KEY,
     codigo VARCHAR(20) UNIQUE NOT NULL,
     nome VARCHAR(120) NOT NULL,
     carga_horaria SMALLINT NOT NULL CHECK (carga_horaria > 0)
 );
 
-CREATE TABLE IF NOT EXISTS curriculo_disciplina (
-    id_curriculo INT NOT NULL REFERENCES curriculo(id_curriculo) ON DELETE CASCADE,
-    id_disciplina INT NOT NULL REFERENCES disciplina(id_disciplina) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS tb_curriculo_disciplina (
+    id_curriculo INT NOT NULL REFERENCES tb_curriculo(id_curriculo) ON DELETE CASCADE,
+    id_disciplina INT NOT NULL REFERENCES tb_disciplina(id_disciplina) ON DELETE CASCADE,
     periodo SMALLINT NOT NULL CHECK (periodo > 0),
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('OBRIGATORIA', 'ELETIVA', 'OPTATIVA')),
     PRIMARY KEY (id_curriculo, id_disciplina)
 );
 
-CREATE TABLE IF NOT EXISTS pre_requisito (
-    id_disciplina INT NOT NULL REFERENCES disciplina(id_disciplina) ON DELETE CASCADE,
-    id_requisito INT NOT NULL REFERENCES disciplina(id_disciplina) ON DELETE CASCADE,
-    vinculo VARCHAR(20) DEFAULT 'OBRIGATORIO',
+CREATE TABLE IF NOT EXISTS tb_pre_requisito (
+    id_disciplina INT NOT NULL REFERENCES tb_disciplina(id_disciplina) ON DELETE CASCADE,
+    id_requisito INT NOT NULL REFERENCES tb_disciplina(id_disciplina) ON DELETE CASCADE,
+    vinculo VARCHAR(20) NOT NULL DEFAULT 'OBRIGATORIO' CHECK (vinculo IN ('OBRIGATORIO', 'RECOMENDADO')),
     PRIMARY KEY (id_disciplina, id_requisito),
     CONSTRAINT chk_requisito_diferente CHECK (id_disciplina <> id_requisito)
 );
 
-CREATE TABLE IF NOT EXISTS aluno (
-    id_aluno SERIAL PRIMARY KEY,
-    id_curriculo INT NOT NULL REFERENCES curriculo(id_curriculo) ON DELETE RESTRICT,
-    matricula VARCHAR(12) UNIQUE NOT NULL,
-    nome VARCHAR(120) NOT NULL,
-    email VARCHAR(120) UNIQUE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS professor (
-    id_professor SERIAL PRIMARY KEY,
-    matricula VARCHAR(12) UNIQUE NOT NULL,
+CREATE TABLE IF NOT EXISTS tb_pessoa (
+    id_pessoa SERIAL PRIMARY KEY,
     nome VARCHAR(120) NOT NULL,
     email VARCHAR(120) UNIQUE NOT NULL,
+    cpf CHAR(11) UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS tb_aluno (
+    id_aluno SERIAL PRIMARY KEY,
+    id_pessoa INT NOT NULL UNIQUE REFERENCES tb_pessoa(id_pessoa) ON DELETE RESTRICT,
+    id_curriculo INT NOT NULL REFERENCES tb_curriculo(id_curriculo) ON DELETE RESTRICT,
+    matricula VARCHAR(12) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS tb_professor (
+    id_professor SERIAL PRIMARY KEY,
+    id_pessoa INT NOT NULL UNIQUE REFERENCES tb_pessoa(id_pessoa) ON DELETE RESTRICT,
+    matricula VARCHAR(12) UNIQUE NOT NULL,
     titulacao VARCHAR(20) NOT NULL CHECK (titulacao IN ('ESPECIALISTA', 'MESTRE', 'DOUTOR'))
 );
 
-CREATE TABLE IF NOT EXISTS sala (
+CREATE TABLE IF NOT EXISTS tb_sala (
     id_sala SERIAL PRIMARY KEY,
-    id_campus INT NOT NULL REFERENCES campus(id_campus) ON DELETE CASCADE,
+    id_campus INT NOT NULL REFERENCES tb_campus(id_campus) ON DELETE CASCADE,
     bloco VARCHAR(10) NOT NULL,
     numero VARCHAR(10) NOT NULL,
-    capacidade SMALLINT NOT NULL CHECK (capacidade > 0)
+    capacidade SMALLINT NOT NULL CHECK (capacidade > 0),
+    CONSTRAINT uk_sala_campus_bloco_num UNIQUE (id_campus, bloco, numero)
 );
 
-CREATE TABLE IF NOT EXISTS feriado (
+CREATE TABLE IF NOT EXISTS tb_feriado (
     id_feriado SERIAL PRIMARY KEY,
-    id_campus INT REFERENCES campus(id_campus) ON DELETE CASCADE,
+    id_estado INT REFERENCES tb_estado(id_estado) ON DELETE CASCADE,
+    id_municipio INT REFERENCES tb_municipio(id_municipio) ON DELETE CASCADE,
     data DATE NOT NULL,
-    descricao VARCHAR(120) NOT NULL
+    descricao VARCHAR(120) NOT NULL,
+    abrangencia VARCHAR(20) NOT NULL CHECK (abrangencia IN ('NACIONAL', 'ESTADUAL', 'MUNICIPAL')),
+    CONSTRAINT chk_feriado_abrangencia CHECK (
+        (abrangencia = 'NACIONAL'  AND id_estado IS NULL AND id_municipio IS NULL) OR
+        (abrangencia = 'ESTADUAL'  AND id_estado IS NOT NULL AND id_municipio IS NULL) OR
+        (abrangencia = 'MUNICIPAL' AND id_municipio IS NOT NULL)
+    )
 );
 
-CREATE TABLE IF NOT EXISTS periodo_letivo (
+CREATE TABLE IF NOT EXISTS tb_periodo_letivo (
     id_periodo_letivo SERIAL PRIMARY KEY,
     ano SMALLINT NOT NULL CHECK (ano >= 2000),
     semestre SMALLINT NOT NULL CHECK (semestre IN (1, 2)),
@@ -92,37 +142,44 @@ CREATE TABLE IF NOT EXISTS periodo_letivo (
     CONSTRAINT uk_ano_semestre UNIQUE (ano, semestre)
 );
 
-CREATE TABLE IF NOT EXISTS turma (
+CREATE TABLE IF NOT EXISTS tb_turma (
     id_turma SERIAL PRIMARY KEY,
-    id_disciplina INT NOT NULL REFERENCES disciplina(id_disciplina) ON DELETE RESTRICT,
-    id_periodo_letivo INT NOT NULL REFERENCES periodo_letivo(id_periodo_letivo) ON DELETE RESTRICT,
-    id_professor INT NOT NULL REFERENCES professor(id_professor) ON DELETE RESTRICT,
+    id_disciplina INT NOT NULL REFERENCES tb_disciplina(id_disciplina) ON DELETE RESTRICT,
+    id_periodo_letivo INT NOT NULL REFERENCES tb_periodo_letivo(id_periodo_letivo) ON DELETE RESTRICT,
+    id_professor INT NOT NULL REFERENCES tb_professor(id_professor) ON DELETE RESTRICT,
     codigo_turma VARCHAR(10) NOT NULL,
     CONSTRAINT uk_disciplina_periodo_turma UNIQUE (id_disciplina, id_periodo_letivo, codigo_turma)
 );
 
-CREATE TABLE IF NOT EXISTS turma_horario (
+-- Ajuste de tipo no Horário (Substituição do TSRANGE incoerente por TIME)
+CREATE TABLE IF NOT EXISTS tb_turma_horario (
     id_turma_horario SERIAL PRIMARY KEY,
-    id_turma INT NOT NULL REFERENCES turma(id_turma) ON DELETE CASCADE,
-    id_sala INT NOT NULL REFERENCES sala(id_sala) ON DELETE RESTRICT,
-    dia_semana SMALLINT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7),
-    faixa TSRANGE NOT NULL
+    id_turma INT NOT NULL REFERENCES tb_turma(id_turma) ON DELETE CASCADE,
+    id_sala INT NOT NULL REFERENCES tb_sala(id_sala) ON DELETE RESTRICT,
+    dia_semana SMALLINT NOT NULL CHECK (dia_semana BETWEEN 1 AND 7), -- 1=Domingo, 7=Sábado
+    hora_inicio TIME NOT NULL,
+    hora_fim TIME NOT NULL,
+    CONSTRAINT chk_horario_valido CHECK (hora_fim > hora_inicio)
 );
 
-CREATE TABLE IF NOT EXISTS matricula (
+CREATE TABLE IF NOT EXISTS tb_matricula (
     id_matricula SERIAL PRIMARY KEY,
-    id_aluno INT NOT NULL REFERENCES aluno(id_aluno) ON DELETE CASCADE,
-    id_turma INT NOT NULL REFERENCES turma(id_turma) ON DELETE CASCADE,
+    id_aluno INT NOT NULL REFERENCES tb_aluno(id_aluno) ON DELETE CASCADE,
+    id_turma INT NOT NULL REFERENCES tb_turma(id_turma) ON DELETE CASCADE,
     nota_final NUMERIC(4,2) CHECK (nota_final BETWEEN 0.00 AND 10.00),
     faltas INT NOT NULL DEFAULT 0 CHECK (faltas >= 0),
     situacao VARCHAR(20) NOT NULL DEFAULT 'MATRICULADO' CHECK (situacao IN ('APROVADO', 'REPROVADO', 'MATRICULADO', 'TRANCADO')),
     CONSTRAINT uk_aluno_turma UNIQUE (id_aluno, id_turma)
 );
 
-CREATE TABLE IF NOT EXISTS log_matricula (
+-- Log mantido mesmo se a matrícula for removida
+CREATE TABLE IF NOT EXISTS tb_log_matricula (
     id_log_matricula SERIAL PRIMARY KEY,
-    id_matricula INT NOT NULL REFERENCES matricula(id_matricula) ON DELETE CASCADE,
+    id_matricula INT, -- Sem NOT NULL rígido para preservar histórico caso a matrícula seja excluída
+    id_aluno INT NOT NULL,
+    id_turma INT NOT NULL,
     acao VARCHAR(20) NOT NULL,
+    detalhes TEXT,
     ocorrido_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
