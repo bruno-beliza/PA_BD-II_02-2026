@@ -3,7 +3,7 @@
 -- ============================================================================
 
 # 1. Criar o Banco de Dados
-psql -U postgres -c "CREATE DATABASE sistema_academico;"
+psql -U bd2 -c "CREATE DATABASE sistema_academico;"
 
 
 -- ============================================================================
@@ -42,8 +42,13 @@ CREATE TABLE IF NOT EXISTS tb_campus (
 CREATE TABLE IF NOT EXISTS tb_curso (
     id_curso SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
-    grau VARCHAR(30) NOT NULL CHECK (grau IN ('BACHARELADO', 'LICENCIATURA', 'TECNOLOGO', 'POS_GRADUACAO'))
+    grau_curso VARCHAR(30) NOT NULL REFERENCES tb_grau_curso(id_grau_curso) ON DELETE RESTRICT,
 );
+
+CREATE TABLE IF NOT EXISTS tb_grau_curso (
+    id_grau_curso SERIAL PRIMARY KEY,
+    grau_curso VARCHAR(30) NOT NULL UNIQUE
+)
 
 -- Tabela Associativa (Oferta de Cursos por Campus - N:N)
 CREATE TABLE IF NOT EXISTS tb_campus_curso (
@@ -182,6 +187,120 @@ CREATE TABLE IF NOT EXISTS tb_log_matricula (
     detalhes TEXT,
     ocorrido_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- CREATE TABLE IF NOT EXISTS tb_historico_academico (
+--     id_historico SERIAL PRIMARY KEY,
+--     id_matricula INT NOT NULL UNIQUE REFERENCES tb_matricula(id_matricula) ON DELETE CASCADE,
+    
+--     -- Notas (A1 e A2)
+--     nota_a1 NUMERIC(4,2) DEFAULT 0.00 CHECK (nota_a1 BETWEEN 0.00 AND 10.00),
+--     nota_a2 NUMERIC(4,2) DEFAULT 0.00 CHECK (nota_a2 BETWEEN 0.00 AND 10.00),
+    
+--     -- Frequência (Percentual de 0.00 a 100.00)
+--     frequencia NUMERIC(5,2) DEFAULT 100.00 CHECK (frequencia BETWEEN 0.00 AND 100.00),
+    
+--     -- REQUISITO 1: Cálculo da MI = (0,4 × A1) + (0,6 × A2)
+--     media_intermediaria NUMERIC(4,2) GENERATED ALWAYS AS (
+--         ROUND((0.40 * COALESCE(nota_a1, 0)) + (0.60 * COALESCE(nota_a2, 0)), 2)
+--     ) STORED,
+    
+--     -- REQUISITO 2: Situação baseada em Frequência >= 75% E MI >= 5.0
+--     situacao VARCHAR(20) GENERATED ALWAYS AS (
+--         CASE 
+--             -- A reprovação por falta tem prioridade (se não for à aula, reprova direto)
+--             WHEN frequencia < 75.00 THEN 'REPROVADO_FALTA'
+            
+--             -- Se teve frequência, valida se a regra da MI atinge 5.0
+--             WHEN ((0.40 * COALESCE(nota_a1, 0)) + (0.60 * COALESCE(nota_a2, 0))) >= 5.00 THEN 'APROVADO'
+            
+--             -- Se não caiu nas condições acima, reprovou por nota
+--             ELSE 'REPROVADO_NOTA'
+--         END
+--     ) STORED,
+    
+--     data_ultima_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- );
+
+CREATE TABLE IF NOT EXISTS tb_turma_avaliacao (
+    id_avaliacao SERIAL PRIMARY KEY,
+    id_turma INT NOT NULL REFERENCES tb_turma(id_turma) ON DELETE CASCADE,
+    descricao VARCHAR(10) NOT NULL CHECK (descricao IN ('A1', 'A2', 'A3', 'EXAME')), 
+    data_prevista DATE,
+    CONSTRAINT uk_turma_avaliacao UNIQUE (id_turma, descricao)
+);
+
+CREATE TABLE IF NOT EXISTS tb_nota (
+    id_nota SERIAL PRIMARY KEY,
+    id_matricula INT NOT NULL REFERENCES tb_matricula(id_matricula) ON DELETE CASCADE,
+    id_avaliacao INT NOT NULL REFERENCES tb_turma_avaliacao(id_avaliacao) ON DELETE CASCADE,
+    valor_nota NUMERIC(4,2) NOT NULL CHECK (valor_nota BETWEEN 0.00 AND 10.00),
+    CONSTRAINT uk_matricula_avaliacao UNIQUE (id_matricula, id_avaliacao)
+);
+
+CREATE TABLE IF NOT EXISTS tb_aula (
+    id_aula SERIAL PRIMARY KEY,
+    id_turma INT NOT NULL REFERENCES tb_turma(id_turma) ON DELETE CASCADE,
+    data_aula DATE NOT NULL,
+    conteudo TEXT,
+    carga_horaria_aula SMALLINT NOT NULL DEFAULT 2 CHECK (carga_horaria_aula > 0)
+);
+
+CREATE TABLE IF NOT EXISTS tb_presenca (
+    id_matricula INT NOT NULL REFERENCES tb_matricula(id_matricula) ON DELETE CASCADE,
+    id_aula INT NOT NULL REFERENCES tb_aula(id_aula) ON DELETE CASCADE,
+    presente BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (id_matricula, id_aula)
+);
+
+CREATE OR REPLACE VIEW vw_historico_academico AS
+WITH notas_pivoteadas AS (
+    -- Gira as notas de linhas para colunas por matrícula
+    SELECT 
+        n.id_matricula,
+        MAX(CASE WHEN a.descricao = 'A1' THEN n.valor_nota END) AS nota_a1,
+        MAX(CASE WHEN a.descricao = 'A2' THEN n.valor_nota END) AS nota_a2
+    FROM tb_nota n
+    JOIN tb_turma_avaliacao a ON n.id_avaliacao = a.id_avaliacao
+    GROUP BY n.id_matricula
+),
+frequencia_calculada AS (
+    -- Calcula o % de presença baseado na carga horária das aulas dadas
+    SELECT 
+        p.id_matricula,
+        ROUND(
+            (SUM(CASE WHEN p.presente = TRUE THEN au.carga_horaria_aula ELSE 0 END)::NUMERIC / 
+             NULLIF(SUM(au.carga_horaria_aula), 0)) * 100
+        , 2) AS perc_frequencia
+    FROM tb_presenca p
+    JOIN tb_aula au ON p.id_aula = au.id_aula
+    GROUP BY p.id_matricula
+)
+-- Une tudo e aplica a regra de negócio final
+SELECT 
+    m.id_matricula,
+    m.id_aluno,
+    t.id_turma,
+    t.codigo_turma,
+    
+    -- Notas com tratamento de nulos (se não fez, é zero)
+    COALESCE(np.nota_a1, 0.00) AS a1,
+    COALESCE(np.nota_a2, 0.00) AS a2,
+    COALESCE(fc.perc_frequencia, 100.00) AS frequencia_perc,
+    
+    -- CÁLCULO DA MÉDIA INTERMEDIÁRIA (MI): 0.4*A1 + 0.6*A2
+    ROUND((0.40 * COALESCE(np.nota_a1, 0)) + (0.60 * COALESCE(np.nota_a2, 0)), 2) AS media_intermediaria,
+    
+    -- REGRA DE APROVAÇÃO (Falta anula a nota)
+    CASE 
+        WHEN COALESCE(fc.perc_frequencia, 100.00) < 75.00 THEN 'REPROVADO_FALTA'
+        WHEN ((0.40 * COALESCE(np.nota_a1, 0)) + (0.60 * COALESCE(np.nota_a2, 0))) >= 5.00 THEN 'APROVADO'
+        ELSE 'REPROVADO_NOTA'
+    END AS situacao
+
+FROM tb_matricula m
+JOIN tb_turma t ON m.id_turma = t.id_turma
+LEFT JOIN notas_pivoteadas np ON m.id_matricula = np.id_matricula
+LEFT JOIN frequencia_calculada fc ON m.id_matricula = fc.id_matricula;
 
 -- ============================================================================
 -- SCRIPT 02: CARGA DE DADOS (150 Alunos, 12 Turmas, 450+ Matrículas)
