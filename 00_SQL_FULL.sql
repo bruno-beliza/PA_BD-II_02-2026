@@ -756,6 +756,60 @@ SELECT setval(pg_get_serial_sequence('tb_log_matricula', 'tb_log_matricula_id'),
 -- Atualização inicial da view materializada após a carga de dados para refletir os dados carregados nos indicadores
 REFRESH MATERIALIZED VIEW mvw_indicadores;
 
+-- ==============================================================================
+-- SEGURANÇA: PAPÉIS (ROLES), PERMISSÕES E RLS (ROW-LEVEL SECURITY)
+-- ==============================================================================
+
+-- 1. Criação dos Grupos de Acesso (Roles sem login)
+CREATE ROLE aluno;
+CREATE ROLE professor;
+CREATE ROLE secretaria;
+CREATE ROLE coordenacao BYPASSRLS; -- Ignora RLS (visão panorâmica da instituição)
+
+-- 2. Revogação de acessos públicos e concessão de uso do Schema/Sequências
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+GRANT USAGE ON SCHEMA public TO aluno, professor, secretaria, coordenacao;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO secretaria, professor; -- Necessário para INSERTs
+
+-- 3. Permissões Estruturais (GRANTs nas Tabelas)
+-- Secretaria: Leitura e escrita administrativa
+GRANT SELECT, INSERT, UPDATE ON matriculas, turmas, notas TO secretaria;
+
+-- Professores: Leitura estrutural, mas escrita restrita às notas
+GRANT SELECT ON turmas, matriculas TO professor;
+GRANT SELECT, INSERT, UPDATE ON notas TO professor;
+
+-- Alunos: Estritamente leitura
+GRANT SELECT ON notas, turmas, matriculas TO aluno;
+
+-- Coordenação: Controle total dos dados (já possui BYPASSRLS para ignorar as políticas abaixo)
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO coordenacao;
+
+-- 4. Segurança em Nível de Linha (RLS)
+-- 4.1 Ativa a interceptação de RLS nas tabelas sensíveis
+ALTER TABLE notas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matriculas ENABLE ROW LEVEL SECURITY;
+
+-- 4.2 Políticas para Alunos: Veem apenas os próprios registros de notas e matrículas
+CREATE POLICY pol_aluno_ver_proprias_notas 
+ON notas FOR SELECT TO aluno USING (id_aluno::text = current_user);
+
+CREATE POLICY pol_aluno_ver_proprias_matriculas 
+ON matriculas FOR SELECT TO aluno USING (id_aluno::text = current_user);
+
+-- 4.3 Políticas para Professores: Veem e editam APENAS notas de suas próprias turmas
+CREATE POLICY pol_professor_suas_turmas 
+ON notas FOR ALL TO professor 
+USING (id_turma IN (SELECT id_turma FROM turmas WHERE id_professor::text = current_user)) 
+WITH CHECK (id_turma IN (SELECT id_turma FROM turmas WHERE id_professor::text = current_user));
+
+-- 4.4 Políticas para Secretaria: Veem e editam todos os registros sujeitos a RLS
+CREATE POLICY pol_secretaria_todas_notas 
+ON notas FOR ALL TO secretaria USING (true) WITH CHECK (true);
+
+CREATE POLICY pol_secretaria_todas_matriculas 
+ON matriculas FOR ALL TO secretaria USING (true) WITH CHECK (true);
+
 -- ============================================================================
 -- 3. DEZ CONSULTAS SQL COM COMPLEXIDADE CRESCENTE
 -- Cada consulta é independente e pode ser executada separadamente.
