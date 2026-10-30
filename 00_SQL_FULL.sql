@@ -3,7 +3,7 @@
 -- ============================================================================
 
 # 1. Criar o Banco de Dados
-psql -U bd2 -c "CREATE DATABASE sistema_academico;"
+psql -U admin -c "CREATE DATABASE sistema_academico;"
 
 
 CREATE TYPE "dia_semana" AS ENUM (
