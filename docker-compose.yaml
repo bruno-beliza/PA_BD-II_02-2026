@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: BD2_Postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: "@DM!N"
+      POSTGRES_DB: sistema_academico
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+
+  pgadmin:
+    image: dpage/pgadmin4:9.19
+    container_name: BD2_pgAdmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@iesb.edu.br
+      PGADMIN_DEFAULT_PASSWORD: "@DM!N"
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

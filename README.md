@@ -1,51 +1,63 @@
 # Sistema Acadêmico PostgreSQL - Projeto de Banco de Dados
 
-Este repositório contém o projeto completo do banco de dados relacional para um Sistema Acadêmico Universitário em PostgreSQL, atendendo a todos os requisitos de DDL, restrições de integridade, carga massiva de dados e consultas avançadas.
+Este repositório contém o projeto completo de um banco de dados relacional para um Sistema Acadêmico Universitário em PostgreSQL. O projeto atende a todos os requisitos de modelagem (DDL), restrições de integridade, carga de dados (DML), automação via Triggers, segurança com RLS, consultas avançadas e análise de performance.
 
-## Como Subir o Banco do Zero
+## 📁 Estrutura de Arquivos
 
-### Pré-requisitos
-- PostgreSQL 14+ instalado (ou contêiner Docker).
+A arquitetura do projeto foi consolidada nos seguintes arquivos principais:
 
-### Instalação via PostgreSQL Nativo (psql)
-
-#### 1 - Executar o script "00_SQL_FULL.sql", o qual contem:
-
-##### 1.1 - Criação do Banco de Dados:
-
-```bash
-psql -U postgres -c "CREATE DATABASE sistema_academico;"
-```
-
-##### 1.2 - Executar DDL (Estrutura e Restrições)
-Seção SCRIPT 01: DDL E RESTRIÇÕES DE INTEGRIDADE
-
-##### 1.3 - Carregar Dados de Teste (generate_series)
-Seção SCRIPT 02: CARGA DE DADOS (150 Alunos, 12 Turmas, 450+ Matrículas)
-
-##### 1.4 - Executar Consultas Analíticas
-Seção SCRIPT 03: CONSULTAS ANALÍTICAS (10 SELECTs)
-
-##### 1.5 - Gerar Evidências de EXPLAIN
-Seção SCRIPT 04: EVIDÊNCIAS DE EXECUÇÃO (EXPLAIN ANALYZE)
-
-### Instalação via Docker Compose (Opcional)
-
-```bash
-docker run --name pg-academico -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=sistema_academico -p 5432:5432 -d postgres:15
-```
-
-## Estrutura e Recursos Implementados
-1. DDL Completo (Seção SCRIPT 01): 15 tabelas com Chaves Primárias, Estrangeiras (ON DELETE CASCADE/RESTRICT), CHECK, UNIQUE e Tipos Especiais (TIMERANGE).
-
-2. Carga de Dados (Seção SCRIPT 02): Uso intensivo de generate_series inserindo 150 alunos, 12 turmas e mais de 400 matrículas.
-
-3. Consultas Avançadas (Seção SCRIPT 03):
-
-- Junção Externa (LEFT JOIN) com Agregação (Q3).
-
-- Window Functions: DENSE_RANK(), PERCENT_RANK() (Q5) e LAG() (Q6).
-
-- Consultas Recursivas (WITH RECURSIVE): Árvore de pré-requisitos (Q7) e Aptidão para cursar disciplinas (Q8).
+*   `docker-compose.yaml`: Orquestração da infraestrutura (PostgreSQL 18 + pgAdmin 4).
+*   `01_CRIACAO_CARGA_2.sql`: Script unificado contendo DDL completo (tabelas, enums, views, materialized views), automação (Triggers), DML (carga de 100 alunos e centenas de matrículas via `generate_series`) e Segurança (Roles, GRANTs e Row-Level Security).
+*   `02_CONSULTAS.sql`: Script contendo as 10 consultas obrigatórias de complexidade crescente (Junções, CTEs Recursivas, Funções de Janela) e validações de integridade.
+*   **`03_EXPLAIN_ANALYZE.sql`**: **Arquivo próprio e isolado** contendo as evidências de plano de execução e custo (`EXPLAIN ANALYZE VERBOSE`) para todas as consultas do projeto.
+*   `BACKUP-RESTORE_2.md`: Manual oficializado com procedimentos de extração e recuperação de dados via CLI do Docker.
 
 ---
+
+## 🚀 Como Subir o Banco do Zero
+
+O ambiente é 100% dockerizado. Para iniciar do zero, siga o passo a passo abaixo:
+
+### Passo 1: Subir a Infraestrutura
+No terminal, navegue até a pasta onde está o arquivo `docker-compose.yaml` e execute:
+```bash
+docker-compose up -d
+```
+*O Docker baixará as imagens e criará os contêineres `BD2_Postgres` e `BD2_pgAdmin`. O banco de dados `sistema_academico` será criado automaticamente pelas variáveis de ambiente.*
+
+### Passo 2: Executar a Criação e Carga de Dados (Script 01)
+Aguarde alguns segundos para o banco iniciar completamente. Em seguida, injete o script principal diretamente no contêiner:
+```bash
+docker exec -i BD2_Postgres psql -U admin -d sistema_academico < 01_CRIACAO_CARGA_2.sql
+```
+*Este comando criará toda a estrutura, as regras automáticas (Triggers), as políticas de segurança e populará o banco com os dados de teste.*
+
+### Passo 3: Executar Consultas e Evidências de Performance (Scripts 02 e 03)
+Com o banco populado, você pode rodar os relatórios e as validações de performance:
+```bash
+# Executar as consultas acadêmicas
+docker exec -i BD2_Postgres psql -U admin -d sistema_academico < 02_CONSULTAS.sql
+
+# Gerar as evidências de performance (EXPLAIN ANALYZE)
+docker exec -i BD2_Postgres psql -U admin -d sistema_academico < 03_EXPLAIN_ANALYZE.sql
+```
+
+---
+
+## 🔑 Acesso Gráfico e Credenciais
+
+Caso prefira inspecionar o banco e rodar os scripts visualmente, o **pgAdmin 4** já está configurado.
+
+**Acesso ao pgAdmin (Navegador):**
+*   **URL:** `http://localhost:5050`
+*   **Login:** `admin@iesb.edu.br`
+*   **Senha:** `@DM!N`
+
+**Conexão do Servidor no pgAdmin:**
+*   **Host/Endereço:** `postgres` *(nome do serviço no docker-compose)*
+*   **Porta:** `5432`
+*   **Database:** `sistema_academico`
+*   **Username:** `admin`
+*   **Password:** `@DM!N`
+
+*(Nota: Para conexões externas via DBeaver, DataGrip ou VSCode, utilize `localhost` e a porta mapeada `5433`)*
