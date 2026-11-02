@@ -1,4 +1,4 @@
-# Sistema Acadêmico PostgreSQL - Projeto de Banco de Dados
+# Sistema Acadêmico PostgreSQL - Projeto de Banco de Dados II
 
 Este repositório contém o projeto completo de um banco de dados relacional para um Sistema Acadêmico Universitário em PostgreSQL. O projeto atende a todos os requisitos de modelagem (DDL), restrições de integridade, carga de dados (DML), automação via Triggers, segurança com RLS, consultas avançadas e análise de performance.
 
